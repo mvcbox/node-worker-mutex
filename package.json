@@ -1,0 +1,51 @@
+{
+  "name": "worker-mutex",
+  "version": "1.0.0",
+  "description": "Worker Mutex",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run clean && node ./node_modules/.bin/tsc",
+    "clean": "node -e \"['./dist', './coverage', './.nyc_output'].forEach(item => require('fs').rmSync(item, {recursive:true,force:true}));\"",
+    "prepack": "npm run build"
+  },
+  "engines": {
+    "node": ">=6.0.0"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=18.0.0",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": ">=8.6.0",
+      "onFail": "error"
+    }
+  },
+  "author": "mvcbox.org@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mvcbox/node-worker-mutex/issues"
+  },
+  "homepage": "https://github.com/mvcbox/node-worker-mutex#readme",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@types/node": "^12.20.55",
+    "typescript": "^5.9.3"
+  }
+}

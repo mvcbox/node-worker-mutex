@@ -1,0 +1,7 @@
+/.idea
+/dist
+/local_data
+/node_modules
+/.nyc_output
+/coverage
+/npm-debug.log

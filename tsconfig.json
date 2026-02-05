@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "lib": ["ES5", "ES6"],
+    "rootDir": "src",
+    "outDir": "dist",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "removeComments": true,
+    "declaration": true,
+    "sourceMap": false,
+    "inlineSources": false,
+    "allowJs": false,
+    "strictNullChecks": true,
+    "preserveConstEnums": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictBuiltinIteratorReturn": true,
+    "strictPropertyInitialization": true,
+    "typeRoots": ["node_modules/@types"]
+  }
+}

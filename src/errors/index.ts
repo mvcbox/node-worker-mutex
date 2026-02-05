@@ -1,0 +1,1 @@
+export { WorkerMutexError } from './WorkerMutexError';
