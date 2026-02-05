@@ -172,7 +172,7 @@ export class WorkerMutex {
           }
 
           await WorkerMutex.sleep(delay);
-          
+
           if (delay < 8) {
             delay += 1;
           }
