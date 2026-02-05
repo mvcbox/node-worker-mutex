@@ -4,9 +4,11 @@ import { WorkerMutexError } from './errors';
 import type { WorkerMutexOptions } from './WorkerMutexOptions';
 
 export class WorkerMutex {
+  private static readonly MAX_RECURSION_COUNT = 2147483647;
   private static readonly STRIDE = 3;
   private static readonly BYTES_PER_MUTEX = Int32Array.BYTES_PER_ELEMENT * WorkerMutex.STRIDE;
   private static readonly MAX_MUTEX_COUNT = Math.floor(Number.MAX_SAFE_INTEGER / WorkerMutex.BYTES_PER_MUTEX);
+  private static mainThreadWarningShown = false;
   private static readonly LOCK_OFFSET = 0;
   private static readonly OWNER_OFFSET = 1;
   private static readonly COUNT_OFFSET = 2;
@@ -74,6 +76,30 @@ export class WorkerMutex {
     return (threadId | 0) + 1;
   }
 
+  private static async sleep(delay: number): Promise<void> {
+    await new Promise<void>((resolve) => setTimeout(resolve, delay));
+  }
+
+  private incrementRecursionCount(ci: number): void {
+    const a = this.i32;
+
+    while (true) {
+      const count = Atomics.load(a, ci);
+
+      if (count <= 0) {
+        throw new WorkerMutexError('MUTEX_RECURSION_COUNT_UNDERFLOW');
+      }
+
+      if (count >= WorkerMutex.MAX_RECURSION_COUNT) {
+        throw new WorkerMutexError('MUTEX_RECURSION_COUNT_OVERFLOW');
+      }
+
+      if (Atomics.compareExchange(a, ci, count, count + 1) === count) {
+        return;
+      }
+    }
+  }
+
   public lock(): void {
     const a = this.i32;
     const fi = this.lockIndex();
@@ -81,11 +107,16 @@ export class WorkerMutex {
     const ci = this.countIndex();
     const me = WorkerMutex.selfId();
 
+    if (threadId === 0 && !WorkerMutex.mainThreadWarningShown) {
+      WorkerMutex.mainThreadWarningShown = true;
+      process.emitWarning('WORKER_MUTEX_LOCK_ON_MAIN_THREAD_BLOCKS_EVENT_LOOP');
+    }
+
     while (true) {
       const owner = Atomics.load(a, oi);
 
       if (owner === me) {
-        Atomics.add(a, ci, 1);
+        this.incrementRecursionCount(ci);
         return;
       }
 
@@ -111,6 +142,7 @@ export class WorkerMutex {
     const oi = this.ownerIndex();
     const ci = this.countIndex();
     const me = WorkerMutex.selfId();
+    let delay = 0;
 
     const anyAtomics = Atomics as unknown as {
       waitAsync?: (
@@ -126,7 +158,7 @@ export class WorkerMutex {
         const owner = Atomics.load(a, oi);
 
         if (owner === me) {
-          Atomics.add(a, ci, 1);
+          this.incrementRecursionCount(ci);
           return;
         }
 
@@ -139,6 +171,10 @@ export class WorkerMutex {
             return;
           }
 
+          await WorkerMutex.sleep(delay);
+          if (delay < 8) {
+            delay += 1;
+          }
           continue;
         }
 
@@ -146,24 +182,29 @@ export class WorkerMutex {
 
         if (res && res.value && typeof (res.value as any).then === 'function') {
           await res.value;
+          delay = 0;
         } else {
-          // "not-equal"/"timed-out" и т.п.
-          await Promise.resolve();
+          await WorkerMutex.sleep(delay);
+
+          if (delay < 8) {
+            delay += 1;
+          }
         }
       }
     }
 
-    let delay = 0;
+    delay = 0;
 
     while (true) {
       const owner = Atomics.load(a, oi);
 
       if (owner === me) {
-        Atomics.add(a, ci, 1);
+        this.incrementRecursionCount(ci);
         return;
       }
 
       const lock = Atomics.load(a, fi);
+
       if (lock === 0) {
         if (Atomics.compareExchange(a, fi, 0, 1) === 0) {
           Atomics.store(a, oi, me);
@@ -171,10 +212,16 @@ export class WorkerMutex {
           return;
         }
 
+        await WorkerMutex.sleep(delay);
+
+        if (delay < 8) {
+          delay += 1;
+        }
+
         continue;
       }
 
-      await new Promise<void>((r) => setTimeout(r, delay));
+      await WorkerMutex.sleep(delay);
 
       if (delay < 8) {
         delay += 1;
