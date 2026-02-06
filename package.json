@@ -1,6 +1,6 @@
 {
   "name": "worker-mutex",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Worker Mutex",
   "type": "commonjs",
   "main": "./dist/index.js",
@@ -42,6 +42,17 @@
     "url": "https://github.com/mvcbox/node-worker-mutex/issues"
   },
   "homepage": "https://github.com/mvcbox/node-worker-mutex#readme",
+  "keywords": [
+    "mutex",
+    "worker",
+    "worker_threads",
+    "sharedarraybuffer",
+    "atomics",
+    "synchronization",
+    "lock",
+    "thread-safe",
+    "nodejs"
+  ],
   "files": [
     "dist",
     "LICENSE",
