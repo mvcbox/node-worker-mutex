@@ -2,6 +2,17 @@
   "name": "worker-mutex",
   "version": "1.0.0",
   "description": "Worker Mutex",
+  "keywords": [
+    "mutex",
+    "worker",
+    "worker_threads",
+    "sharedarraybuffer",
+    "atomics",
+    "synchronization",
+    "lock",
+    "thread-safe",
+    "nodejs"
+  ],
   "type": "commonjs",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
