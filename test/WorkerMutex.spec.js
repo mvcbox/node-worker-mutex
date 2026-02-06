@@ -137,19 +137,19 @@ describe('WorkerMutex', function() {
   });
 
   it('validates constructor options', () => {
-    expect(() => new WorkerMutex({ handle: new ArrayBuffer(8) })).to.throw(
+    expect(() => new WorkerMutex({ sharedBuffer: new ArrayBuffer(8) })).to.throw(
       WorkerMutexError,
       'HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER'
     );
-    expect(() => new WorkerMutex({ handle: new SharedArrayBuffer(10) })).to.throw(
+    expect(() => new WorkerMutex({ sharedBuffer: new SharedArrayBuffer(10) })).to.throw(
       WorkerMutexError,
       'HANDLE_BYTE_LENGTH_IS_NOT_INT32_ALIGNED'
     );
-    expect(() => new WorkerMutex({ handle: WorkerMutex.createSharedBuffer(1), index: 2 })).to.throw(
+    expect(() => new WorkerMutex({ sharedBuffer: WorkerMutex.createSharedBuffer(1), index: 2 })).to.throw(
       WorkerMutexError,
       'MUTEX_INDEX_OUT_OF_RANGE'
     );
-    expect(() => new WorkerMutex({ handle: WorkerMutex.createSharedBuffer(1), index: 1.5 })).to.throw(
+    expect(() => new WorkerMutex({ sharedBuffer: WorkerMutex.createSharedBuffer(1), index: 1.5 })).to.throw(
       WorkerMutexError,
       'VALUE_MUST_BE_AN_UNSIGNED_INTEGER'
     );
@@ -157,7 +157,7 @@ describe('WorkerMutex', function() {
 
   it('supports recursive lock and full unlock', () => {
     const buffer = WorkerMutex.createSharedBuffer();
-    const mutex = new WorkerMutex({ handle: buffer });
+    const mutex = new WorkerMutex({ sharedBuffer: buffer });
     const cells = new Int32Array(buffer);
 
     mutex.lock();
@@ -177,7 +177,7 @@ describe('WorkerMutex', function() {
   });
 
   it('throws when unlocking from non-owner thread/state', () => {
-    const mutex = new WorkerMutex({ handle: WorkerMutex.createSharedBuffer() });
+    const mutex = new WorkerMutex({ sharedBuffer: WorkerMutex.createSharedBuffer() });
 
     expect(() => mutex.unlock()).to.throw(
       WorkerMutexError,
@@ -187,7 +187,7 @@ describe('WorkerMutex', function() {
 
   it('detects recursion counter underflow', () => {
     const buffer = WorkerMutex.createSharedBuffer();
-    const mutex = new WorkerMutex({ handle: buffer });
+    const mutex = new WorkerMutex({ sharedBuffer: buffer });
     const cells = new Int32Array(buffer);
 
     mutex.lock();
@@ -201,7 +201,7 @@ describe('WorkerMutex', function() {
 
   it('detects recursion counter overflow on re-entrant lock', () => {
     const buffer = WorkerMutex.createSharedBuffer();
-    const mutex = new WorkerMutex({ handle: buffer });
+    const mutex = new WorkerMutex({ sharedBuffer: buffer });
     const cells = new Int32Array(buffer);
 
     mutex.lock();
@@ -215,7 +215,7 @@ describe('WorkerMutex', function() {
 
   it('supports recursive lockAsync on same thread', async () => {
     const buffer = WorkerMutex.createSharedBuffer();
-    const mutex = new WorkerMutex({ handle: buffer });
+    const mutex = new WorkerMutex({ sharedBuffer: buffer });
     const cells = new Int32Array(buffer);
 
     await mutex.lockAsync();
@@ -233,7 +233,7 @@ describe('WorkerMutex', function() {
 
   it('waits in lockAsync until another thread releases mutex', async () => {
     const mutexBuffer = WorkerMutex.createSharedBuffer(1);
-    const mutex = new WorkerMutex({ handle: mutexBuffer, index: 0 });
+    const mutex = new WorkerMutex({ sharedBuffer: mutexBuffer, index: 0 });
 
     const worker = new Worker(HOLD_LOCK_WORKER_PATH, {
       workerData: {
