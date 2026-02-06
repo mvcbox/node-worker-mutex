@@ -41,7 +41,7 @@ export class WorkerMutex {
     this.base = base;
   }
 
-  static createSharedBuffer(count: number = 1): SharedArrayBuffer {
+  public static createSharedBuffer(count: number = 1): SharedArrayBuffer {
     if (!Number.isSafeInteger(count) || count <= 0) {
       throw new WorkerMutexError('COUNT_MUST_BE_A_POSITIVE_SAFE_INTEGER');
     }
