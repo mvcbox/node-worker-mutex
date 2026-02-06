@@ -10,6 +10,7 @@ export class WorkerMutex {
   private static readonly COUNT_OFFSET = 2;
   private static mainThreadWarningShown = false;
   private static readonly MAX_RECURSION_COUNT = 2147483647;
+  private static readonly KEEP_ALIVE_TIMEOUT_MS = 2147483647;
   private static readonly BYTES_PER_MUTEX = Int32Array.BYTES_PER_ELEMENT * WorkerMutex.STRIDE;
   private static readonly MAX_MUTEX_COUNT = Math.floor(Number.MAX_SAFE_INTEGER / WorkerMutex.BYTES_PER_MUTEX);
 
@@ -78,6 +79,16 @@ export class WorkerMutex {
 
   private static async sleep(delay: number): Promise<void> {
     await new Promise<void>((resolve) => setTimeout(resolve, delay));
+  }
+
+  private static async awaitWaitAsync(value: Promise<string>): Promise<void> {
+    const keepAliveTimer = setTimeout(() => undefined, WorkerMutex.KEEP_ALIVE_TIMEOUT_MS);
+
+    try {
+      await value;
+    } finally {
+      clearTimeout(keepAliveTimer);
+    }
   }
 
   private incrementRecursionCount(ci: number): void {
@@ -183,7 +194,7 @@ export class WorkerMutex {
         const res = anyAtomics.waitAsync(a, fi, lock);
 
         if (res && res.value && typeof (res.value as any).then === 'function') {
-          await res.value;
+          await WorkerMutex.awaitWaitAsync(res.value as Promise<string>);
           delay = 0;
         } else {
           await WorkerMutex.sleep(delay);
