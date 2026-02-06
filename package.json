@@ -16,6 +16,9 @@
   "scripts": {
     "build": "npm run clean && node ./node_modules/.bin/tsc",
     "clean": "node -e \"['./dist', './coverage', './.nyc_output'].forEach(item => require('fs').rmSync(item, {recursive:true,force:true}));\"",
+    "test": "npm run test:unit",
+    "test:unit": "mocha --timeout 30000 \"test/**/*.spec.js\"",
+    "coverage": "node -r ./test/setup-os-cpus.js ./node_modules/nyc/bin/nyc.js mocha --timeout 30000 \"test/**/*.spec.js\"",
     "prepack": "npm run build"
   },
   "engines": {
@@ -46,6 +49,26 @@
   ],
   "devDependencies": {
     "@types/node": "^12.20.55",
+    "chai": "^4.3.10",
+    "mocha": "^9.2.2",
+    "nyc": "^15.1.0",
     "typescript": "^5.9.3"
+  },
+  "nyc": {
+    "all": true,
+    "concurrency": 1,
+    "include": [
+      "dist/**/*.js"
+    ],
+    "exclude": [
+      "dist/index.js",
+      "dist/main.js",
+      "dist/worker.js"
+    ],
+    "reporter": [
+      "text",
+      "lcov",
+      "html"
+    ]
   }
 }
