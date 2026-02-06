@@ -4,14 +4,14 @@ import { WorkerMutexError } from './errors';
 import type { WorkerMutexOptions } from './WorkerMutexOptions';
 
 export class WorkerMutex {
-  private static readonly MAX_RECURSION_COUNT = 2147483647;
   private static readonly STRIDE = 3;
-  private static readonly BYTES_PER_MUTEX = Int32Array.BYTES_PER_ELEMENT * WorkerMutex.STRIDE;
-  private static readonly MAX_MUTEX_COUNT = Math.floor(Number.MAX_SAFE_INTEGER / WorkerMutex.BYTES_PER_MUTEX);
-  private static mainThreadWarningShown = false;
   private static readonly LOCK_OFFSET = 0;
   private static readonly OWNER_OFFSET = 1;
   private static readonly COUNT_OFFSET = 2;
+  private static mainThreadWarningShown = false;
+  private static readonly MAX_RECURSION_COUNT = 2147483647;
+  private static readonly BYTES_PER_MUTEX = Int32Array.BYTES_PER_ELEMENT * WorkerMutex.STRIDE;
+  private static readonly MAX_MUTEX_COUNT = Math.floor(Number.MAX_SAFE_INTEGER / WorkerMutex.BYTES_PER_MUTEX);
 
   private readonly i32: Int32Array;
   private readonly base: number;

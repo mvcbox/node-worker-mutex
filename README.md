@@ -36,7 +36,8 @@ try {
 ---
 ## Quick start with `worker_threads`
 ```ts
-// main.ts
+// main.ts (transpile with "module": "CommonJS")
+import * as path from 'path';
 import { Worker } from 'worker_threads';
 import { WorkerMutex } from 'worker-mutex';
 
@@ -44,22 +45,36 @@ const mutexBuffer = WorkerMutex.createSharedBuffer(1);
 const counterBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
 const counter = new Int32Array(counterBuffer);
 
-const workers = Array.from({ length: 4 }, () => {
-  return new Worker(new URL('./worker.js', import.meta.url), {
-    workerData: { mutexBuffer, counterBuffer },
+function runWorker() {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, 'worker.js'), {
+      workerData: { mutexBuffer, counterBuffer },
+    });
+
+    worker.once('error', reject);
+    worker.once('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Worker exited with code ${code}`));
+        return;
+      }
+
+      resolve();
+    });
   });
-});
+}
 
-await Promise.all(workers.map((w) => new Promise<void>((resolve, reject) => {
-  w.once('exit', () => resolve());
-  w.once('error', reject);
-})));
-
-console.log(counter[0]); // expected: 40000
+Promise.all(Array.from({ length: 4 }, () => runWorker()))
+  .then(() => {
+    console.log(counter[0]); // expected: 40000
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 ```
 
 ```ts
-// worker.ts
+// worker.ts (runtime file is worker.js after transpile)
 import { workerData } from 'worker_threads';
 import { WorkerMutex } from 'worker-mutex';
 
