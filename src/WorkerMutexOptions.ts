@@ -1,4 +1,4 @@
 export type WorkerMutexOptions = {
   index?: number;
-  handle: SharedArrayBuffer;
+  sharedBuffer: SharedArrayBuffer;
 };

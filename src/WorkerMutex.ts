@@ -18,19 +18,19 @@ export class WorkerMutex {
   private readonly base: number;
 
   public constructor(options: WorkerMutexOptions) {
-    const handle = options.handle;
     const index = options.index ?? 0;
+    const sharedBuffer = options.sharedBuffer;
     utils.assertUnsignedInteger(index);
 
-    if (!(handle instanceof SharedArrayBuffer)) {
+    if (!(sharedBuffer instanceof SharedArrayBuffer)) {
       throw new WorkerMutexError('HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER');
     }
 
-    if (handle.byteLength % Int32Array.BYTES_PER_ELEMENT !== 0) {
+    if (sharedBuffer.byteLength % Int32Array.BYTES_PER_ELEMENT !== 0) {
       throw new WorkerMutexError('HANDLE_BYTE_LENGTH_IS_NOT_INT32_ALIGNED');
     }
 
-    const view = new Int32Array(handle);
+    const view = new Int32Array(sharedBuffer);
     const base = index * WorkerMutex.STRIDE;
 
     if (index < 0 || base + (WorkerMutex.STRIDE - 1) >= view.length) {
