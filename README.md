@@ -1,4 +1,6 @@
-# worker-mutex
+[![npm version](https://badge.fury.io/js/worker-mutex.svg)](https://badge.fury.io/js/worker-mutex)
+
+# Worker Mutex
 Re-entrant mutex for Node.js `worker_threads` based on `SharedArrayBuffer` + `Atomics`.
 
 - Works across workers and the main thread.
@@ -96,7 +98,7 @@ for (let i = 0; i < 10_000; i += 1) {
 Each mutex occupies 3 `Int32` slots in the shared buffer:
 
 1. `flag` (`0` = unlocked, `1` = locked)
-2. `owner` (`threadId + 1`, `0` means no owner)
+2. `owner` (`threadId` of the owning thread; meaningful only when `flag = 1`)
 3. `recursionCount` (current re-entrant depth)
 
 `createSharedBuffer(count)` allocates `count * 3 * Int32Array.BYTES_PER_ELEMENT` bytes.
@@ -178,3 +180,7 @@ Possible error codes:
   `WORKER_MUTEX_LOCK_ON_MAIN_THREAD_BLOCKS_EVENT_LOOP`.
 - Fairness is not guaranteed under heavy contention.
 - Always pair `lock/lockAsync` with `unlock` in `try/finally`.
+
+## License
+
+MIT
