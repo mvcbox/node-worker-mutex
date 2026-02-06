@@ -20,7 +20,7 @@ npm install worker-mutex
 import { WorkerMutex } from 'worker-mutex';
 
 const shared = WorkerMutex.createSharedBuffer();
-const mutex = new WorkerMutex({ handle: shared });
+const mutex = new WorkerMutex({ sharedBuffer: shared });
 
 mutex.lock();
 try {
@@ -80,7 +80,7 @@ Promise.all(Array.from({ length: 4 }, () => runWorker()))
 import { workerData } from 'worker_threads';
 import { WorkerMutex } from 'worker-mutex';
 
-const mutex = new WorkerMutex({ handle: workerData.mutexBuffer, index: 0 });
+const mutex = new WorkerMutex({ sharedBuffer: workerData.mutexBuffer, index: 0 });
 const counter = new Int32Array(workerData.counterBuffer);
 
 for (let i = 0; i < 10_000; i += 1) {
@@ -109,9 +109,9 @@ Each mutex occupies 3 `Int32` slots in the shared buffer:
 import { WorkerMutex } from 'worker-mutex';
 
 const shared = WorkerMutex.createSharedBuffer(3);
-const mutexA = new WorkerMutex({ handle: shared, index: 0 });
-const mutexB = new WorkerMutex({ handle: shared, index: 1 });
-const mutexC = new WorkerMutex({ handle: shared, index: 2 });
+const mutexA = new WorkerMutex({ sharedBuffer: shared, index: 0 });
+const mutexB = new WorkerMutex({ sharedBuffer: shared, index: 1 });
+const mutexC = new WorkerMutex({ sharedBuffer: shared, index: 2 });
 ```
 
 ---
@@ -129,13 +129,17 @@ Creates a mutex view over an existing shared buffer.
 
 ```ts
 type WorkerMutexOptions = {
-  handle: SharedArrayBuffer;
+  sharedBuffer: SharedArrayBuffer;
   index?: number; // default: 0, unsigned safe integer
 };
 ```
 
+- `sharedBuffer` must be a `SharedArrayBuffer`;
+  otherwise `HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER` is thrown.
+- `sharedBuffer.byteLength` must be divisible by `Int32Array.BYTES_PER_ELEMENT`;
+  otherwise `HANDLE_BYTE_LENGTH_IS_NOT_INT32_ALIGNED` is thrown.
 - `index` must be an unsigned safe integer.
-- `index` must point to an existing mutex slot in `handle`;
+- `index` must point to an existing mutex slot in `sharedBuffer`;
   otherwise `MUTEX_INDEX_OUT_OF_RANGE` is thrown.
 
 ### `mutex.lock(): void`

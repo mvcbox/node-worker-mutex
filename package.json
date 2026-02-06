@@ -1,6 +1,6 @@
 {
   "name": "worker-mutex",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Worker Mutex",
   "type": "commonjs",
   "main": "./dist/index.js",
