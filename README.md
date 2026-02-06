@@ -120,6 +120,8 @@ const mutexC = new WorkerMutex({ handle: shared, index: 2 });
 Creates a shared buffer for one or more mutexes.
 
 - `count` must be a positive safe integer.
+- `count` must not exceed the internal maximum (`MAX_MUTEX_COUNT`);
+  otherwise `COUNT_EXCEEDS_MAX_SUPPORTED_VALUE` is thrown.
 - Default: `1`.
 
 ### `new WorkerMutex(options)`
@@ -128,9 +130,13 @@ Creates a mutex view over an existing shared buffer.
 ```ts
 type WorkerMutexOptions = {
   handle: SharedArrayBuffer;
-  index?: number; // default: 0
+  index?: number; // default: 0, unsigned safe integer
 };
 ```
+
+- `index` must be an unsigned safe integer.
+- `index` must point to an existing mutex slot in `handle`;
+  otherwise `MUTEX_INDEX_OUT_OF_RANGE` is thrown.
 
 ### `mutex.lock(): void`
 Blocking lock.
