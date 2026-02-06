@@ -161,7 +161,7 @@ Unlocks one recursion level.
 - Throws if current thread is not the owner.
 - Fully releases mutex only when recursion depth reaches `0`.
 
-### `mutex.buffer: SharedArrayBuffer`
+### `mutex.sharedBuffer: SharedArrayBuffer`
 Returns original `SharedArrayBuffer`.
 
 ### `mutex.index: number`
