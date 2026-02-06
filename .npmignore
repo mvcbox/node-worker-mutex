@@ -1,6 +1,7 @@
 /src
 /test
 /types
+/local_data
 /tsconfig.json
 /package-lock.json
 /.idea
