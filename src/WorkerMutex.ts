@@ -74,7 +74,7 @@ export class WorkerMutex {
   }
 
   private static selfId(): number {
-    return (threadId | 0) + 1;
+    return threadId;
   }
 
   private static async sleep(delay: number): Promise<void> {
@@ -124,14 +124,13 @@ export class WorkerMutex {
     }
 
     while (true) {
+      const lock = Atomics.load(a, fi);
       const owner = Atomics.load(a, oi);
 
-      if (owner === me) {
+      if (lock === 1 && owner === me) {
         this.incrementRecursionCount(ci);
         return;
       }
-
-      const lock = Atomics.load(a, fi);
 
       if (lock === 0) {
         if (Atomics.compareExchange(a, fi, 0, 1) === 0) {
@@ -166,14 +165,13 @@ export class WorkerMutex {
 
     if (typeof anyAtomics.waitAsync === 'function') {
       while (true) {
+        const lock = Atomics.load(a, fi);
         const owner = Atomics.load(a, oi);
 
-        if (owner === me) {
+        if (lock === 1 && owner === me) {
           this.incrementRecursionCount(ci);
           return;
         }
-
-        const lock = Atomics.load(a, fi);
 
         if (lock === 0) {
           if (Atomics.compareExchange(a, fi, 0, 1) === 0) {
@@ -209,14 +207,13 @@ export class WorkerMutex {
     delay = 0;
 
     while (true) {
+      const lock = Atomics.load(a, fi);
       const owner = Atomics.load(a, oi);
 
-      if (owner === me) {
+      if (lock === 1 && owner === me) {
         this.incrementRecursionCount(ci);
         return;
       }
-
-      const lock = Atomics.load(a, fi);
 
       if (lock === 0) {
         if (Atomics.compareExchange(a, fi, 0, 1) === 0) {
@@ -249,9 +246,10 @@ export class WorkerMutex {
     const ci = this.countIndex();
     const me = WorkerMutex.selfId();
 
+    const lock = Atomics.load(a, fi);
     const owner = Atomics.load(a, oi);
 
-    if (owner !== me) {
+    if (lock !== 1 || owner !== me) {
       throw new WorkerMutexError('MUTEX_IS_NOT_OWNED_BY_CURRENT_THREAD');
     }
 
