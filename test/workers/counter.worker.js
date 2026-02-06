@@ -4,7 +4,7 @@ const { parentPort, workerData } = require('worker_threads');
 const { WorkerMutex } = require(workerData.libPath);
 
 (async () => {
-  const mutex = new WorkerMutex({ handle: workerData.mutexBuffer, index: 0 });
+  const mutex = new WorkerMutex({ sharedBuffer: workerData.mutexBuffer, index: 0 });
   const counter = new Int32Array(workerData.counterBuffer);
   const iterations = workerData.iterations | 0;
 

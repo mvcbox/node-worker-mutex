@@ -53,7 +53,7 @@ export class WorkerMutex {
     return new SharedArrayBuffer(WorkerMutex.BYTES_PER_MUTEX * count);
   }
 
-  public get buffer(): SharedArrayBuffer {
+  public get sharedBuffer(): SharedArrayBuffer {
     return this.i32.buffer as SharedArrayBuffer;
   }
 
