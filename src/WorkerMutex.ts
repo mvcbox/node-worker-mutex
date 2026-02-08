@@ -1,6 +1,6 @@
 import { threadId } from 'worker_threads';
-import type { Worker } from 'worker_threads';
 import { WorkerMutexError } from './errors';
+import type { Worker } from 'worker_threads';
 
 export class WorkerMutex {
   private static readonly STRIDE = 3;
