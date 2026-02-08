@@ -1,3 +1,1 @@
-export type WorkerMutexOptions = {
-  sharedBuffer: SharedArrayBuffer;
-};
+export type WorkerMutexOptions = {};

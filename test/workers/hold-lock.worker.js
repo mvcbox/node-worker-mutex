@@ -4,7 +4,7 @@ const { parentPort, workerData } = require('worker_threads');
 const { WorkerMutex } = require(workerData.libPath);
 
 try {
-  const mutex = new WorkerMutex({ sharedBuffer: workerData.mutexBuffer });
+  const mutex = new WorkerMutex(workerData.mutexBuffer);
   mutex.lock();
   parentPort.postMessage({ state: 'locked' });
 

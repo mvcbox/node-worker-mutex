@@ -20,7 +20,7 @@ npm install worker-mutex
 import { WorkerMutex } from 'worker-mutex';
 
 const shared = WorkerMutex.createSharedBuffer();
-const mutex = new WorkerMutex({ sharedBuffer: shared });
+const mutex = new WorkerMutex(shared);
 
 mutex.lock();
 try {
@@ -80,7 +80,7 @@ Promise.all(Array.from({ length: 4 }, () => runWorker()))
 import { workerData } from 'worker_threads';
 import { WorkerMutex } from 'worker-mutex';
 
-const mutex = new WorkerMutex({ sharedBuffer: workerData.mutexBuffer });
+const mutex = new WorkerMutex(workerData.mutexBuffer);
 const counter = new Int32Array(workerData.counterBuffer);
 
 for (let i = 0; i < 10_000; i += 1) {
@@ -108,14 +108,8 @@ Each mutex occupies 3 `Int32` slots in the shared buffer:
 ### `WorkerMutex.createSharedBuffer(): SharedArrayBuffer`
 Creates a shared buffer for a single mutex.
 
-### `new WorkerMutex(options)`
-Creates a mutex view over an existing shared buffer.
-
-```ts
-type WorkerMutexOptions = {
-  sharedBuffer: SharedArrayBuffer;
-};
-```
+### `new WorkerMutex(sharedBuffer: SharedArrayBuffer)`
+Creates a mutex over an existing shared buffer.
 
 - `sharedBuffer` must be a `SharedArrayBuffer`;
   otherwise `HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER` is thrown.

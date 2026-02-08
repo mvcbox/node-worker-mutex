@@ -1,6 +1,5 @@
 import { threadId } from 'worker_threads';
 import { WorkerMutexError } from './errors';
-import type { WorkerMutexOptions } from './WorkerMutexOptions';
 
 export class WorkerMutex {
   private static readonly STRIDE = 3;
@@ -14,9 +13,7 @@ export class WorkerMutex {
 
   private readonly i32: Int32Array;
 
-  public constructor(options: WorkerMutexOptions) {
-    const sharedBuffer = options.sharedBuffer;
-
+  public constructor(sharedBuffer: SharedArrayBuffer) {
     if (!(sharedBuffer instanceof SharedArrayBuffer)) {
       throw new WorkerMutexError('HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER');
     }
