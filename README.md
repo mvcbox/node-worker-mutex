@@ -52,12 +52,10 @@ function runWorker() {
     const worker = new Worker(path.join(__dirname, 'worker.js'), {
       workerData: { mutexBuffer, counterBuffer },
     });
-    const unbind = WorkerMutex.bindWorkerExit(worker, mutexBuffer);
+    WorkerMutex.bindWorkerExit(worker, mutexBuffer);
 
     worker.once('error', reject);
     worker.once('exit', (code) => {
-      unbind();
-
       if (code !== 0) {
         reject(new Error(`Worker exited with code ${code}`));
         return;
@@ -116,7 +114,7 @@ Binds automatic stale-lock cleanup to worker termination.
 
 - On `worker` `exit`, if mutex is still locked and `owner === worker.threadId`,
   mutex state is force-reset (`flag/owner/recursionCount` -> `0`) and waiters are notified.
-- Returns unsubscribe function that removes the `exit` listener.
+- Returns unsubscribe function for optional early detach; after `exit`, manual detach is not required (`once` listener).
 - `worker` must support `once('exit', ...)` and have positive integer `threadId`,
   otherwise `WORKER_INSTANCE_MUST_SUPPORT_EXIT_EVENT` or
   `WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER` is thrown.
