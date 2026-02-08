@@ -149,6 +149,7 @@ Possible error codes:
 - `MUTEX_IS_NOT_OWNED_BY_CURRENT_THREAD`
 - `MUTEX_RECURSION_COUNT_UNDERFLOW`
 - `MUTEX_RECURSION_COUNT_OVERFLOW`
+  (can be thrown by re-entrant `lock()`/`lockAsync()` when recursion depth reaches `Int32` max)
 
 ---
 ## Notes and limitations
