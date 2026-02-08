@@ -8,6 +8,7 @@ const { WorkerMutex, WorkerMutexError } = require('../dist');
 const LIB_PATH = path.resolve(__dirname, '..', 'dist');
 const COUNTER_WORKER_PATH = path.resolve(__dirname, 'workers', 'counter.worker.js');
 const HOLD_LOCK_WORKER_PATH = path.resolve(__dirname, 'workers', 'hold-lock.worker.js');
+const ABANDON_LOCK_WORKER_PATH = path.resolve(__dirname, 'workers', 'abandon-lock.worker.js');
 
 function runCounterWorker({ mutexBuffer, counterBuffer, iterations, useAsync }) {
   return new Promise((resolve, reject) => {
@@ -144,6 +145,23 @@ describe('WorkerMutex', function() {
     );
   });
 
+  it('validates bindWorkerExit arguments', () => {
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
+
+    expect(() => WorkerMutex.bindWorkerExit(null, mutexBuffer)).to.throw(
+      WorkerMutexError,
+      'WORKER_INSTANCE_MUST_SUPPORT_EXIT_EVENT'
+    );
+    expect(() => WorkerMutex.bindWorkerExit({ threadId: 0, once: () => undefined }, mutexBuffer)).to.throw(
+      WorkerMutexError,
+      'WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER'
+    );
+    expect(() => WorkerMutex.bindWorkerExit({ threadId: 1, once: () => undefined }, new ArrayBuffer(8))).to.throw(
+      WorkerMutexError,
+      'HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER'
+    );
+  });
+
   it('supports recursive lock and full unlock', () => {
     const buffer = WorkerMutex.createSharedBuffer();
     const mutex = new WorkerMutex(buffer);
@@ -247,6 +265,36 @@ describe('WorkerMutex', function() {
       mutex.unlock();
     } finally {
       await exitPromise;
+    }
+  });
+
+  it('releases abandoned lock when tracked worker exits', async () => {
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
+    const mutex = new WorkerMutex(mutexBuffer);
+    const cells = new Int32Array(mutexBuffer);
+    const worker = new Worker(ABANDON_LOCK_WORKER_PATH, {
+      workerData: {
+        libPath: LIB_PATH,
+        mutexBuffer,
+      },
+    });
+
+    const stopTracking = WorkerMutex.bindWorkerExit(worker, mutexBuffer);
+
+    try {
+      const state = await waitForMessage(worker);
+      expect(state).deep.equal({ state: 'locked' });
+
+      await waitForExit(worker);
+
+      expect(cells[0]).equal(0);
+      expect(cells[1]).equal(0);
+      expect(cells[2]).equal(0);
+
+      mutex.lock();
+      mutex.unlock();
+    } finally {
+      stopTracking();
     }
   });
 

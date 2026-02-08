@@ -1,4 +1,5 @@
 import { threadId } from 'worker_threads';
+import type { Worker } from 'worker_threads';
 import { WorkerMutexError } from './errors';
 
 export class WorkerMutex {
@@ -14,19 +15,44 @@ export class WorkerMutex {
   private readonly i32: Int32Array;
 
   public constructor(sharedBuffer: SharedArrayBuffer) {
-    if (!(sharedBuffer instanceof SharedArrayBuffer)) {
-      throw new WorkerMutexError('HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER');
-    }
-
-    if (sharedBuffer.byteLength !== WorkerMutex.BYTES_PER_MUTEX) {
-      throw new WorkerMutexError('MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX');
-    }
+    WorkerMutex.assertSharedBuffer(sharedBuffer);
 
     this.i32 = new Int32Array(sharedBuffer);
   }
 
   public static createSharedBuffer(): SharedArrayBuffer {
     return new SharedArrayBuffer(WorkerMutex.BYTES_PER_MUTEX);
+  }
+
+  public static bindWorkerExit(worker: Worker, sharedBuffer: SharedArrayBuffer): () => void {
+    if (!worker || typeof worker !== 'object' || typeof worker.once !== 'function') {
+      throw new WorkerMutexError('WORKER_INSTANCE_MUST_SUPPORT_EXIT_EVENT');
+    }
+
+    const workerId = worker.threadId;
+
+    if (!Number.isInteger(workerId) || workerId <= 0) {
+      throw new WorkerMutexError('WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER');
+    }
+
+    WorkerMutex.assertSharedBuffer(sharedBuffer);
+
+    const onExit = (): void => {
+      WorkerMutex.releaseAbandonedLock(sharedBuffer, workerId);
+    };
+
+    worker.once('exit', onExit);
+
+    return (): void => {
+      if (typeof worker.off === 'function') {
+        worker.off('exit', onExit);
+        return;
+      }
+
+      if (typeof worker.removeListener === 'function') {
+        worker.removeListener('exit', onExit);
+      }
+    };
   }
 
   public get sharedBuffer(): SharedArrayBuffer {
@@ -47,6 +73,46 @@ export class WorkerMutex {
 
   private static selfId(): number {
     return threadId;
+  }
+
+  private static assertSharedBuffer(sharedBuffer: SharedArrayBuffer): void {
+    if (!(sharedBuffer instanceof SharedArrayBuffer)) {
+      throw new WorkerMutexError('HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER');
+    }
+
+    if (sharedBuffer.byteLength !== WorkerMutex.BYTES_PER_MUTEX) {
+      throw new WorkerMutexError('MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX');
+    }
+  }
+
+  private static releaseAbandonedLock(sharedBuffer: SharedArrayBuffer, workerId: number): void {
+    const a = new Int32Array(sharedBuffer);
+    const fi = WorkerMutex.LOCK_OFFSET;
+    const oi = WorkerMutex.OWNER_OFFSET;
+    const ci = WorkerMutex.COUNT_OFFSET;
+
+    while (true) {
+      const lock = Atomics.load(a, fi);
+
+      if (lock !== 1) {
+        return;
+      }
+
+      const owner = Atomics.load(a, oi);
+
+      if (owner !== workerId) {
+        return;
+      }
+
+      if (Atomics.compareExchange(a, oi, workerId, 0) !== workerId) {
+        continue;
+      }
+
+      Atomics.store(a, ci, 0);
+      Atomics.store(a, fi, 0);
+      Atomics.notify(a, fi, 1);
+      return;
+    }
   }
 
   private static async sleep(delay: number): Promise<void> {

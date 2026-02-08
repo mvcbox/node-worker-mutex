@@ -52,9 +52,12 @@ function runWorker() {
     const worker = new Worker(path.join(__dirname, 'worker.js'), {
       workerData: { mutexBuffer, counterBuffer },
     });
+    const unbind = WorkerMutex.bindWorkerExit(worker, mutexBuffer);
 
     worker.once('error', reject);
     worker.once('exit', (code) => {
+      unbind();
+
       if (code !== 0) {
         reject(new Error(`Worker exited with code ${code}`));
         return;
@@ -108,6 +111,17 @@ Each mutex occupies 3 `Int32` slots in the shared buffer:
 ### `WorkerMutex.createSharedBuffer(): SharedArrayBuffer`
 Creates a shared buffer for a single mutex.
 
+### `WorkerMutex.bindWorkerExit(worker, sharedBuffer): () => void`
+Binds automatic stale-lock cleanup to worker termination.
+
+- On `worker` `exit`, if mutex is still locked and `owner === worker.threadId`,
+  mutex state is force-reset (`flag/owner/recursionCount` -> `0`) and waiters are notified.
+- Returns unsubscribe function that removes the `exit` listener.
+- `worker` must support `once('exit', ...)` and have positive integer `threadId`,
+  otherwise `WORKER_INSTANCE_MUST_SUPPORT_EXIT_EVENT` or
+  `WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER` is thrown.
+- `sharedBuffer` validation is the same as constructor validation.
+
 ### `new WorkerMutex(sharedBuffer: SharedArrayBuffer)`
 Creates a mutex over an existing shared buffer.
 
@@ -150,12 +164,15 @@ Possible error codes:
 - `MUTEX_RECURSION_COUNT_UNDERFLOW`
 - `MUTEX_RECURSION_COUNT_OVERFLOW`
   (can be thrown by re-entrant `lock()`/`lockAsync()` when recursion depth reaches `Int32` max)
+- `WORKER_INSTANCE_MUST_SUPPORT_EXIT_EVENT`
+- `WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER`
 
 ---
 ## Notes and limitations
 - `lock()` is blocking and can pause the main thread event loop while waiting.
 - On the first `lock()` call from the main thread, the library emits a process warning:
   `WORKER_MUTEX_LOCK_ON_MAIN_THREAD_BLOCKS_EVENT_LOOP`.
+- For crash-safe cleanup, call `WorkerMutex.bindWorkerExit(worker, mutexBuffer)` in code that creates workers.
 - Fairness is not guaranteed under heavy contention.
 - Always pair `lock/lockAsync` with `unlock` in `try/finally`.
 
