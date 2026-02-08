@@ -114,26 +114,19 @@ describe('WorkerMutex', function() {
   });
 
   it('allocates shared buffer with expected size', () => {
-    const count = 4;
-    const buffer = WorkerMutex.createSharedBuffer(count);
+    const buffer = WorkerMutex.createSharedBuffer();
 
     expect(buffer).instanceOf(SharedArrayBuffer);
-    expect(buffer.byteLength).equal(count * 3 * Int32Array.BYTES_PER_ELEMENT);
+    expect(buffer.byteLength).equal(3 * Int32Array.BYTES_PER_ELEMENT);
   });
 
-  it('validates count for createSharedBuffer', () => {
-    expect(() => WorkerMutex.createSharedBuffer(0)).to.throw(
-      WorkerMutexError,
-      'COUNT_MUST_BE_A_POSITIVE_SAFE_INTEGER'
-    );
-    expect(() => WorkerMutex.createSharedBuffer(1.2)).to.throw(
-      WorkerMutexError,
-      'COUNT_MUST_BE_A_POSITIVE_SAFE_INTEGER'
-    );
-    expect(() => WorkerMutex.createSharedBuffer(Number.MAX_SAFE_INTEGER)).to.throw(
-      WorkerMutexError,
-      'COUNT_EXCEEDS_MAX_SUPPORTED_VALUE'
-    );
+  it('returns distinct buffers for each call', () => {
+    const a = WorkerMutex.createSharedBuffer();
+    const b = WorkerMutex.createSharedBuffer();
+
+    expect(a).not.equal(b);
+    expect(a.byteLength).equal(3 * Int32Array.BYTES_PER_ELEMENT);
+    expect(b.byteLength).equal(3 * Int32Array.BYTES_PER_ELEMENT);
   });
 
   it('validates constructor options', () => {
@@ -143,15 +136,11 @@ describe('WorkerMutex', function() {
     );
     expect(() => new WorkerMutex({ sharedBuffer: new SharedArrayBuffer(10) })).to.throw(
       WorkerMutexError,
-      'HANDLE_BYTE_LENGTH_IS_NOT_INT32_ALIGNED'
+      'MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX'
     );
-    expect(() => new WorkerMutex({ sharedBuffer: WorkerMutex.createSharedBuffer(1), index: 2 })).to.throw(
+    expect(() => new WorkerMutex({ sharedBuffer: new SharedArrayBuffer(4) })).to.throw(
       WorkerMutexError,
-      'MUTEX_INDEX_OUT_OF_RANGE'
-    );
-    expect(() => new WorkerMutex({ sharedBuffer: WorkerMutex.createSharedBuffer(1), index: 1.5 })).to.throw(
-      WorkerMutexError,
-      'VALUE_MUST_BE_AN_UNSIGNED_INTEGER'
+      'MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX'
     );
   });
 
@@ -232,8 +221,8 @@ describe('WorkerMutex', function() {
   });
 
   it('waits in lockAsync until another thread releases mutex', async () => {
-    const mutexBuffer = WorkerMutex.createSharedBuffer(1);
-    const mutex = new WorkerMutex({ sharedBuffer: mutexBuffer, index: 0 });
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
+    const mutex = new WorkerMutex({ sharedBuffer: mutexBuffer });
 
     const worker = new Worker(HOLD_LOCK_WORKER_PATH, {
       workerData: {
@@ -264,7 +253,7 @@ describe('WorkerMutex', function() {
   it('serializes increments across workers with lock()', async () => {
     const workers = 4;
     const iterations = 1000;
-    const mutexBuffer = WorkerMutex.createSharedBuffer(1);
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
     const counterBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
     const counter = new Int32Array(counterBuffer);
 
@@ -283,7 +272,7 @@ describe('WorkerMutex', function() {
   it('serializes increments across workers with lockAsync()', async () => {
     const workers = 4;
     const iterations = 1000;
-    const mutexBuffer = WorkerMutex.createSharedBuffer(1);
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
     const counterBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
     const counter = new Int32Array(counterBuffer);
 

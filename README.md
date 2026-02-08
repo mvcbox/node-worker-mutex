@@ -6,7 +6,7 @@ Re-entrant mutex for Node.js `worker_threads` based on `SharedArrayBuffer` + `At
 - Works across workers and the main thread.
 - Supports recursive lock by the same thread.
 - Supports blocking (`lock`) and non-blocking (`lockAsync`) modes.
-- Can store multiple mutex instances in one shared buffer.
+- Uses one `SharedArrayBuffer` per mutex.
 
 ---
 ## Installation
@@ -43,7 +43,7 @@ import * as path from 'path';
 import { Worker } from 'worker_threads';
 import { WorkerMutex } from 'worker-mutex';
 
-const mutexBuffer = WorkerMutex.createSharedBuffer(1);
+const mutexBuffer = WorkerMutex.createSharedBuffer();
 const counterBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
 const counter = new Int32Array(counterBuffer);
 
@@ -80,7 +80,7 @@ Promise.all(Array.from({ length: 4 }, () => runWorker()))
 import { workerData } from 'worker_threads';
 import { WorkerMutex } from 'worker-mutex';
 
-const mutex = new WorkerMutex({ sharedBuffer: workerData.mutexBuffer, index: 0 });
+const mutex = new WorkerMutex({ sharedBuffer: workerData.mutexBuffer });
 const counter = new Int32Array(workerData.counterBuffer);
 
 for (let i = 0; i < 10_000; i += 1) {
@@ -101,28 +101,12 @@ Each mutex occupies 3 `Int32` slots in the shared buffer:
 2. `owner` (`threadId` of the owning thread; meaningful only when `flag = 1`)
 3. `recursionCount` (current re-entrant depth)
 
-`createSharedBuffer(count)` allocates `count * 3 * Int32Array.BYTES_PER_ELEMENT` bytes.
-
----
-## Multiple mutexes in one buffer
-```ts
-import { WorkerMutex } from 'worker-mutex';
-
-const shared = WorkerMutex.createSharedBuffer(3);
-const mutexA = new WorkerMutex({ sharedBuffer: shared, index: 0 });
-const mutexB = new WorkerMutex({ sharedBuffer: shared, index: 1 });
-const mutexC = new WorkerMutex({ sharedBuffer: shared, index: 2 });
-```
+`createSharedBuffer()` allocates `3 * Int32Array.BYTES_PER_ELEMENT` bytes.
 
 ---
 ## API reference
-### `WorkerMutex.createSharedBuffer(count?: number): SharedArrayBuffer`
-Creates a shared buffer for one or more mutexes.
-
-- `count` must be a positive safe integer.
-- `count` must not exceed the internal maximum (`MAX_MUTEX_COUNT`);
-  otherwise `COUNT_EXCEEDS_MAX_SUPPORTED_VALUE` is thrown.
-- Default: `1`.
+### `WorkerMutex.createSharedBuffer(): SharedArrayBuffer`
+Creates a shared buffer for a single mutex.
 
 ### `new WorkerMutex(options)`
 Creates a mutex view over an existing shared buffer.
@@ -130,17 +114,13 @@ Creates a mutex view over an existing shared buffer.
 ```ts
 type WorkerMutexOptions = {
   sharedBuffer: SharedArrayBuffer;
-  index?: number; // default: 0, unsigned safe integer
 };
 ```
 
 - `sharedBuffer` must be a `SharedArrayBuffer`;
   otherwise `HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER` is thrown.
-- `sharedBuffer.byteLength` must be divisible by `Int32Array.BYTES_PER_ELEMENT`;
-  otherwise `HANDLE_BYTE_LENGTH_IS_NOT_INT32_ALIGNED` is thrown.
-- `index` must be an unsigned safe integer.
-- `index` must point to an existing mutex slot in `sharedBuffer`;
-  otherwise `MUTEX_INDEX_OUT_OF_RANGE` is thrown.
+- `sharedBuffer.byteLength` must match one mutex layout (`3 * Int32`);
+  otherwise `MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX` is thrown.
 
 ### `mutex.lock(): void`
 Blocking lock.
@@ -164,9 +144,6 @@ Unlocks one recursion level.
 ### `mutex.sharedBuffer: SharedArrayBuffer`
 Returns original `SharedArrayBuffer`.
 
-### `mutex.index: number`
-Returns mutex index in the shared buffer.
-
 ---
 ## Errors
 All custom errors are instances of `WorkerMutexError`.
@@ -174,14 +151,10 @@ All custom errors are instances of `WorkerMutexError`.
 Possible error codes:
 
 - `HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER`
-- `HANDLE_BYTE_LENGTH_IS_NOT_INT32_ALIGNED`
-- `MUTEX_INDEX_OUT_OF_RANGE`
-- `COUNT_MUST_BE_A_POSITIVE_SAFE_INTEGER`
-- `COUNT_EXCEEDS_MAX_SUPPORTED_VALUE`
+- `MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX`
 - `MUTEX_IS_NOT_OWNED_BY_CURRENT_THREAD`
 - `MUTEX_RECURSION_COUNT_UNDERFLOW`
 - `MUTEX_RECURSION_COUNT_OVERFLOW`
-- `VALUE_MUST_BE_AN_UNSIGNED_INTEGER`
 
 ---
 ## Notes and limitations
