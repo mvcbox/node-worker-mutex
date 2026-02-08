@@ -160,6 +160,14 @@ describe('WorkerMutex', function() {
       WorkerMutexError,
       'HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER'
     );
+    expect(() => WorkerMutex.bindWorkerExit({
+      threadId: 1,
+      once: () => undefined,
+      exitCode: 0,
+    }, mutexBuffer)).to.throw(
+      WorkerMutexError,
+      'WORKER_IS_ALREADY_EXITED'
+    );
   });
 
   it('supports recursive lock and full unlock', () => {

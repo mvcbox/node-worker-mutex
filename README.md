@@ -120,6 +120,7 @@ Binds automatic stale-lock cleanup to worker termination.
 - `worker` must support `once('exit', ...)` and have positive integer `threadId`,
   otherwise `WORKER_INSTANCE_MUST_SUPPORT_EXIT_EVENT` or
   `WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER` is thrown.
+- Binding to an already terminated worker throws `WORKER_IS_ALREADY_EXITED`.
 - `sharedBuffer` validation is the same as constructor validation.
 
 ### `new WorkerMutex(sharedBuffer: SharedArrayBuffer)`
@@ -166,6 +167,7 @@ Possible error codes:
   (can be thrown by re-entrant `lock()`/`lockAsync()` when recursion depth reaches `Int32` max)
 - `WORKER_INSTANCE_MUST_SUPPORT_EXIT_EVENT`
 - `WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER`
+- `WORKER_IS_ALREADY_EXITED`
 
 ---
 ## Notes and limitations

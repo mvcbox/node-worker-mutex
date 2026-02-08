@@ -35,6 +35,10 @@ export class WorkerMutex {
       throw new WorkerMutexError('WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER');
     }
 
+    if (WorkerMutex.hasWorkerExited(worker)) {
+      throw new WorkerMutexError('WORKER_IS_ALREADY_EXITED');
+    }
+
     WorkerMutex.assertSharedBuffer(sharedBuffer);
 
     const onExit = (): void => {
@@ -43,15 +47,13 @@ export class WorkerMutex {
 
     worker.once('exit', onExit);
 
-    return (): void => {
-      if (typeof worker.off === 'function') {
-        worker.off('exit', onExit);
-        return;
-      }
+    if (WorkerMutex.hasWorkerExited(worker)) {
+      WorkerMutex.detachExitListener(worker, onExit);
+      throw new WorkerMutexError('WORKER_IS_ALREADY_EXITED');
+    }
 
-      if (typeof worker.removeListener === 'function') {
-        worker.removeListener('exit', onExit);
-      }
+    return (): void => {
+      WorkerMutex.detachExitListener(worker, onExit);
     };
   }
 
@@ -83,6 +85,25 @@ export class WorkerMutex {
     if (sharedBuffer.byteLength !== WorkerMutex.BYTES_PER_MUTEX) {
       throw new WorkerMutexError('MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX');
     }
+  }
+
+  private static detachExitListener(
+    worker: Worker,
+    listener: (exitCode: number) => void
+  ): void {
+    if (typeof worker.off === 'function') {
+      worker.off('exit', listener);
+      return;
+    }
+
+    if (typeof worker.removeListener === 'function') {
+      worker.removeListener('exit', listener);
+    }
+  }
+
+  private static hasWorkerExited(worker: Worker): boolean {
+    const exitCode = (worker as unknown as { exitCode?: number | null }).exitCode;
+    return typeof exitCode === 'number';
   }
 
   private static releaseAbandonedLock(sharedBuffer: SharedArrayBuffer, workerId: number): void {
