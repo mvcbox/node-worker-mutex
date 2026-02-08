@@ -9,17 +9,8 @@ try {
   parentPort.postMessage({ state: 'locked' });
 
   setTimeout(() => {
-    try {
-      mutex.unlock();
-      parentPort.postMessage({ state: 'released' });
-    } catch (error) {
-      parentPort.postMessage({
-        state: 'error',
-        error: error && error.stack ? error.stack : String(error),
-      });
-      process.exitCode = 1;
-    }
-  }, workerData.holdMs);
+    process.exit(0);
+  }, 0);
 } catch (error) {
   parentPort.postMessage({
     state: 'error',

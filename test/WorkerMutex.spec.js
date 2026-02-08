@@ -8,6 +8,7 @@ const { WorkerMutex, WorkerMutexError } = require('../dist');
 const LIB_PATH = path.resolve(__dirname, '..', 'dist');
 const COUNTER_WORKER_PATH = path.resolve(__dirname, 'workers', 'counter.worker.js');
 const HOLD_LOCK_WORKER_PATH = path.resolve(__dirname, 'workers', 'hold-lock.worker.js');
+const ABANDON_LOCK_WORKER_PATH = path.resolve(__dirname, 'workers', 'abandon-lock.worker.js');
 
 function runCounterWorker({ mutexBuffer, counterBuffer, iterations, useAsync }) {
   return new Promise((resolve, reject) => {
@@ -114,50 +115,56 @@ describe('WorkerMutex', function() {
   });
 
   it('allocates shared buffer with expected size', () => {
-    const count = 4;
-    const buffer = WorkerMutex.createSharedBuffer(count);
+    const buffer = WorkerMutex.createSharedBuffer();
 
     expect(buffer).instanceOf(SharedArrayBuffer);
-    expect(buffer.byteLength).equal(count * 3 * Int32Array.BYTES_PER_ELEMENT);
+    expect(buffer.byteLength).equal(3 * Int32Array.BYTES_PER_ELEMENT);
   });
 
-  it('validates count for createSharedBuffer', () => {
-    expect(() => WorkerMutex.createSharedBuffer(0)).to.throw(
-      WorkerMutexError,
-      'COUNT_MUST_BE_A_POSITIVE_SAFE_INTEGER'
-    );
-    expect(() => WorkerMutex.createSharedBuffer(1.2)).to.throw(
-      WorkerMutexError,
-      'COUNT_MUST_BE_A_POSITIVE_SAFE_INTEGER'
-    );
-    expect(() => WorkerMutex.createSharedBuffer(Number.MAX_SAFE_INTEGER)).to.throw(
-      WorkerMutexError,
-      'COUNT_EXCEEDS_MAX_SUPPORTED_VALUE'
-    );
+  it('returns distinct buffers for each call', () => {
+    const a = WorkerMutex.createSharedBuffer();
+    const b = WorkerMutex.createSharedBuffer();
+
+    expect(a).not.equal(b);
+    expect(a.byteLength).equal(3 * Int32Array.BYTES_PER_ELEMENT);
+    expect(b.byteLength).equal(3 * Int32Array.BYTES_PER_ELEMENT);
   });
 
-  it('validates constructor options', () => {
-    expect(() => new WorkerMutex({ sharedBuffer: new ArrayBuffer(8) })).to.throw(
+  it('validates constructor arguments', () => {
+    expect(() => new WorkerMutex(new ArrayBuffer(8))).to.throw(
       WorkerMutexError,
       'HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER'
     );
-    expect(() => new WorkerMutex({ sharedBuffer: new SharedArrayBuffer(10) })).to.throw(
+    expect(() => new WorkerMutex(new SharedArrayBuffer(10))).to.throw(
       WorkerMutexError,
-      'HANDLE_BYTE_LENGTH_IS_NOT_INT32_ALIGNED'
+      'MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX'
     );
-    expect(() => new WorkerMutex({ sharedBuffer: WorkerMutex.createSharedBuffer(1), index: 2 })).to.throw(
+    expect(() => new WorkerMutex(new SharedArrayBuffer(4))).to.throw(
       WorkerMutexError,
-      'MUTEX_INDEX_OUT_OF_RANGE'
+      'MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX'
     );
-    expect(() => new WorkerMutex({ sharedBuffer: WorkerMutex.createSharedBuffer(1), index: 1.5 })).to.throw(
+  });
+
+  it('validates bindWorkerExit arguments', () => {
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
+
+    expect(() => WorkerMutex.bindWorkerExit(null, mutexBuffer)).to.throw(
       WorkerMutexError,
-      'VALUE_MUST_BE_AN_UNSIGNED_INTEGER'
+      'WORKER_INSTANCE_MUST_SUPPORT_EXIT_EVENT'
+    );
+    expect(() => WorkerMutex.bindWorkerExit({ threadId: 0, once: () => undefined }, mutexBuffer)).to.throw(
+      WorkerMutexError,
+      'WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER'
+    );
+    expect(() => WorkerMutex.bindWorkerExit({ threadId: 1, once: () => undefined }, new ArrayBuffer(8))).to.throw(
+      WorkerMutexError,
+      'HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER'
     );
   });
 
   it('supports recursive lock and full unlock', () => {
     const buffer = WorkerMutex.createSharedBuffer();
-    const mutex = new WorkerMutex({ sharedBuffer: buffer });
+    const mutex = new WorkerMutex(buffer);
     const cells = new Int32Array(buffer);
 
     mutex.lock();
@@ -177,7 +184,7 @@ describe('WorkerMutex', function() {
   });
 
   it('throws when unlocking from non-owner thread/state', () => {
-    const mutex = new WorkerMutex({ sharedBuffer: WorkerMutex.createSharedBuffer() });
+    const mutex = new WorkerMutex(WorkerMutex.createSharedBuffer());
 
     expect(() => mutex.unlock()).to.throw(
       WorkerMutexError,
@@ -187,7 +194,7 @@ describe('WorkerMutex', function() {
 
   it('detects recursion counter underflow', () => {
     const buffer = WorkerMutex.createSharedBuffer();
-    const mutex = new WorkerMutex({ sharedBuffer: buffer });
+    const mutex = new WorkerMutex(buffer);
     const cells = new Int32Array(buffer);
 
     mutex.lock();
@@ -201,7 +208,7 @@ describe('WorkerMutex', function() {
 
   it('detects recursion counter overflow on re-entrant lock', () => {
     const buffer = WorkerMutex.createSharedBuffer();
-    const mutex = new WorkerMutex({ sharedBuffer: buffer });
+    const mutex = new WorkerMutex(buffer);
     const cells = new Int32Array(buffer);
 
     mutex.lock();
@@ -215,7 +222,7 @@ describe('WorkerMutex', function() {
 
   it('supports recursive lockAsync on same thread', async () => {
     const buffer = WorkerMutex.createSharedBuffer();
-    const mutex = new WorkerMutex({ sharedBuffer: buffer });
+    const mutex = new WorkerMutex(buffer);
     const cells = new Int32Array(buffer);
 
     await mutex.lockAsync();
@@ -232,8 +239,8 @@ describe('WorkerMutex', function() {
   });
 
   it('waits in lockAsync until another thread releases mutex', async () => {
-    const mutexBuffer = WorkerMutex.createSharedBuffer(1);
-    const mutex = new WorkerMutex({ sharedBuffer: mutexBuffer, index: 0 });
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
+    const mutex = new WorkerMutex(mutexBuffer);
 
     const worker = new Worker(HOLD_LOCK_WORKER_PATH, {
       workerData: {
@@ -261,10 +268,40 @@ describe('WorkerMutex', function() {
     }
   });
 
+  it('releases abandoned lock when tracked worker exits', async () => {
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
+    const mutex = new WorkerMutex(mutexBuffer);
+    const cells = new Int32Array(mutexBuffer);
+    const worker = new Worker(ABANDON_LOCK_WORKER_PATH, {
+      workerData: {
+        libPath: LIB_PATH,
+        mutexBuffer,
+      },
+    });
+
+    const stopTracking = WorkerMutex.bindWorkerExit(worker, mutexBuffer);
+
+    try {
+      const state = await waitForMessage(worker);
+      expect(state).deep.equal({ state: 'locked' });
+
+      await waitForExit(worker);
+
+      expect(cells[0]).equal(0);
+      expect(cells[1]).equal(0);
+      expect(cells[2]).equal(0);
+
+      mutex.lock();
+      mutex.unlock();
+    } finally {
+      stopTracking();
+    }
+  });
+
   it('serializes increments across workers with lock()', async () => {
     const workers = 4;
     const iterations = 1000;
-    const mutexBuffer = WorkerMutex.createSharedBuffer(1);
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
     const counterBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
     const counter = new Int32Array(counterBuffer);
 
@@ -283,7 +320,7 @@ describe('WorkerMutex', function() {
   it('serializes increments across workers with lockAsync()', async () => {
     const workers = 4;
     const iterations = 1000;
-    const mutexBuffer = WorkerMutex.createSharedBuffer(1);
+    const mutexBuffer = WorkerMutex.createSharedBuffer();
     const counterBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
     const counter = new Int32Array(counterBuffer);
 

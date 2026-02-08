@@ -1,7 +1,6 @@
-import * as utils from './utils';
 import { threadId } from 'worker_threads';
+import type { Worker } from 'worker_threads';
 import { WorkerMutexError } from './errors';
-import type { WorkerMutexOptions } from './WorkerMutexOptions';
 
 export class WorkerMutex {
   private static readonly STRIDE = 3;
@@ -12,69 +11,108 @@ export class WorkerMutex {
   private static readonly MAX_RECURSION_COUNT = 2147483647;
   private static readonly KEEP_ALIVE_TIMEOUT_MS = 2147483647;
   private static readonly BYTES_PER_MUTEX = Int32Array.BYTES_PER_ELEMENT * WorkerMutex.STRIDE;
-  private static readonly MAX_MUTEX_COUNT = Math.floor(Number.MAX_SAFE_INTEGER / WorkerMutex.BYTES_PER_MUTEX);
 
   private readonly i32: Int32Array;
-  private readonly base: number;
 
-  public constructor(options: WorkerMutexOptions) {
-    const index = options.index ?? 0;
-    const sharedBuffer = options.sharedBuffer;
-    utils.assertUnsignedInteger(index);
+  public constructor(sharedBuffer: SharedArrayBuffer) {
+    WorkerMutex.assertSharedBuffer(sharedBuffer);
 
-    if (!(sharedBuffer instanceof SharedArrayBuffer)) {
-      throw new WorkerMutexError('HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER');
-    }
-
-    if (sharedBuffer.byteLength % Int32Array.BYTES_PER_ELEMENT !== 0) {
-      throw new WorkerMutexError('HANDLE_BYTE_LENGTH_IS_NOT_INT32_ALIGNED');
-    }
-
-    const view = new Int32Array(sharedBuffer);
-    const base = index * WorkerMutex.STRIDE;
-
-    if (index < 0 || base + (WorkerMutex.STRIDE - 1) >= view.length) {
-      throw new WorkerMutexError('MUTEX_INDEX_OUT_OF_RANGE');
-    }
-
-    this.i32 = view;
-    this.base = base;
+    this.i32 = new Int32Array(sharedBuffer);
   }
 
-  public static createSharedBuffer(count: number = 1): SharedArrayBuffer {
-    if (!Number.isSafeInteger(count) || count <= 0) {
-      throw new WorkerMutexError('COUNT_MUST_BE_A_POSITIVE_SAFE_INTEGER');
+  public static createSharedBuffer(): SharedArrayBuffer {
+    return new SharedArrayBuffer(WorkerMutex.BYTES_PER_MUTEX);
+  }
+
+  public static bindWorkerExit(worker: Worker, sharedBuffer: SharedArrayBuffer): () => void {
+    if (!worker || typeof worker !== 'object' || typeof worker.once !== 'function') {
+      throw new WorkerMutexError('WORKER_INSTANCE_MUST_SUPPORT_EXIT_EVENT');
     }
 
-    if (count > WorkerMutex.MAX_MUTEX_COUNT) {
-      throw new WorkerMutexError('COUNT_EXCEEDS_MAX_SUPPORTED_VALUE');
+    const workerId = worker.threadId;
+
+    if (!Number.isInteger(workerId) || workerId <= 0) {
+      throw new WorkerMutexError('WORKER_THREAD_ID_MUST_BE_A_POSITIVE_INTEGER');
     }
 
-    return new SharedArrayBuffer(WorkerMutex.BYTES_PER_MUTEX * count);
+    WorkerMutex.assertSharedBuffer(sharedBuffer);
+
+    const onExit = (): void => {
+      WorkerMutex.releaseAbandonedLock(sharedBuffer, workerId);
+    };
+
+    worker.once('exit', onExit);
+
+    return (): void => {
+      if (typeof worker.off === 'function') {
+        worker.off('exit', onExit);
+        return;
+      }
+
+      if (typeof worker.removeListener === 'function') {
+        worker.removeListener('exit', onExit);
+      }
+    };
   }
 
   public get sharedBuffer(): SharedArrayBuffer {
     return this.i32.buffer as SharedArrayBuffer;
   }
 
-  public get index(): number {
-    return this.base / WorkerMutex.STRIDE;
-  }
-
   private ownerIndex(): number {
-    return this.base + WorkerMutex.OWNER_OFFSET;
+    return WorkerMutex.OWNER_OFFSET;
   }
 
   private lockIndex(): number {
-    return this.base + WorkerMutex.LOCK_OFFSET;
+    return WorkerMutex.LOCK_OFFSET;
   }
 
   private countIndex(): number {
-    return this.base + WorkerMutex.COUNT_OFFSET;
+    return WorkerMutex.COUNT_OFFSET;
   }
 
   private static selfId(): number {
     return threadId;
+  }
+
+  private static assertSharedBuffer(sharedBuffer: SharedArrayBuffer): void {
+    if (!(sharedBuffer instanceof SharedArrayBuffer)) {
+      throw new WorkerMutexError('HANDLE_MUST_BE_A_SHARED_ARRAY_BUFFER');
+    }
+
+    if (sharedBuffer.byteLength !== WorkerMutex.BYTES_PER_MUTEX) {
+      throw new WorkerMutexError('MUTEX_BUFFER_SIZE_MUST_MATCH_SINGLE_MUTEX');
+    }
+  }
+
+  private static releaseAbandonedLock(sharedBuffer: SharedArrayBuffer, workerId: number): void {
+    const a = new Int32Array(sharedBuffer);
+    const fi = WorkerMutex.LOCK_OFFSET;
+    const oi = WorkerMutex.OWNER_OFFSET;
+    const ci = WorkerMutex.COUNT_OFFSET;
+
+    while (true) {
+      const lock = Atomics.load(a, fi);
+
+      if (lock !== 1) {
+        return;
+      }
+
+      const owner = Atomics.load(a, oi);
+
+      if (owner !== workerId) {
+        return;
+      }
+
+      if (Atomics.compareExchange(a, oi, workerId, 0) !== workerId) {
+        continue;
+      }
+
+      Atomics.store(a, ci, 0);
+      Atomics.store(a, fi, 0);
+      Atomics.notify(a, fi, 1);
+      return;
+    }
   }
 
   private static async sleep(delay: number): Promise<void> {
