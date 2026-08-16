@@ -1,3 +1,4 @@
 export * from './errors';
 export { WorkerMutex } from './WorkerMutex';
-export type { WorkerMutexOptions } from './WorkerMutexOptions';
+export { WorkerMutexLease } from './WorkerMutexLease';
+export { WorkerMutexModeEnum } from './WorkerMutexModeEnum';

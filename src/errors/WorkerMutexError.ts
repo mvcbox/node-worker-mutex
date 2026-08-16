@@ -1,10 +1,15 @@
+import type { WorkerMutexErrorCodeEnum } from './WorkerMutexErrorCodeEnum';
+
 export class WorkerMutexError extends Error {
-  public constructor(message?: string) {
-    super(message);
-    this.name = new.target.name;
+  public readonly code: WorkerMutexErrorCodeEnum;
+
+  public constructor(code: WorkerMutexErrorCodeEnum) {
+    super(code);
+    this.code = code;
+    this.name = 'WorkerMutexError';
 
     if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, new.target);
+      Error.captureStackTrace(this, WorkerMutexError);
     }
   }
 }
