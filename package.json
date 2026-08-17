@@ -1,6 +1,6 @@
 {
   "name": "worker-mutex",
-  "version": "1.0.6",
+  "version": "2.0.0",
   "description": "Worker Mutex",
   "type": "commonjs",
   "main": "./dist/index.js",
@@ -14,11 +14,18 @@
     }
   },
   "scripts": {
-    "build": "npm run clean && node ./node_modules/.bin/tsc",
-    "clean": "node -e \"['./dist', './coverage', './.nyc_output'].forEach(item => require('fs').rmSync(item, {recursive:true,force:true}));\"",
-    "test": "npm run test:unit",
-    "test:unit": "mocha --timeout 30000 \"test/**/*.spec.js\"",
-    "coverage": "node -r ./test/setup-os-cpus.js ./node_modules/nyc/bin/nyc.js mocha --timeout 30000 \"test/**/*.spec.js\"",
+    "build": "npm run clean && tsc --project tsconfig.json && node scripts/deconstify-declarations.js",
+    "clean": "node -e \"require('fs').rmSync('./dist', { recursive: true, force: true });\"",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "npm run build && npm run test:compiled",
+    "test:compiled": "node --test --test-concurrency=1 test/WorkerMutex.spec.js test/WorkerMutex.exit.spec.js test/WorkerMutex.scheduler.spec.js",
+    "test:compat": "npm run build && npm run test:compat:compiled",
+    "test:compat:compiled": "node test/compat/node-10.5.smoke.js .",
+    "test:package": "npm run build && npm run test:package:compiled",
+    "test:package:compiled": "node test/package-smoke.js",
+    "coverage": "npm run build && npm run coverage:compiled",
+    "coverage:compiled": "node --experimental-test-coverage --test-coverage-include=dist/**/*.js --test-coverage-lines=85 --test-coverage-branches=80 --test-coverage-functions=90 --test --test-concurrency=1 test/WorkerMutex.spec.js test/WorkerMutex.exit.spec.js test/WorkerMutex.scheduler.spec.js",
+    "package:check": "npm run build && npm pack --dry-run --ignore-scripts",
     "prepack": "npm run build"
   },
   "engines": {
@@ -27,12 +34,12 @@
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": ">=18.0.0",
+      "version": ">=22.8.0",
       "onFail": "error"
     },
     "packageManager": {
       "name": "npm",
-      "version": ">=8.6.0",
+      "version": ">=10.8.0",
       "onFail": "error"
     }
   },
@@ -40,6 +47,10 @@
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/mvcbox/node-worker-mutex/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mvcbox/node-worker-mutex.git"
   },
   "homepage": "https://github.com/mvcbox/node-worker-mutex#readme",
   "keywords": [
@@ -58,28 +69,11 @@
     "LICENSE",
     "README.md"
   ],
-  "devDependencies": {
-    "@types/node": "^12.20.55",
-    "chai": "^4.3.10",
-    "mocha": "^9.2.2",
-    "nyc": "^15.1.0",
-    "typescript": "^5.9.3"
+  "dependencies": {
+    "@types/node": "22.20.1"
   },
-  "nyc": {
-    "all": true,
-    "concurrency": 1,
-    "include": [
-      "dist/**/*.js"
-    ],
-    "exclude": [
-      "dist/index.js",
-      "dist/main.js",
-      "dist/worker.js"
-    ],
-    "reporter": [
-      "text",
-      "lcov",
-      "html"
-    ]
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "typescript-5-6": "npm:typescript@5.6.3"
   }
 }
