@@ -1,18 +1,14 @@
 import type { AcquireAsyncOutputDTO } from './acquire-async';
 import type { BindWorkerExitInputDTO, BindWorkerExitOutputDTO } from './bind-worker-exit';
-import type {
-  CreateSharedBufferInputDTO,
-  CreateSharedBufferOutputDTO
-} from './create-shared-buffer';
+import type { CreateSharedBufferInputDTO, CreateSharedBufferOutputDTO } from './create-shared-buffer';
 import type { AtomicsAdapter } from '../internal/AtomicsAdapter';
 import type { BoundBuffer } from '../internal/BoundBuffer';
 import type { LockOutputDTO } from './lock';
 import type { RunExclusiveOutputDTO } from './run-exclusive';
 import type { UnlockOutputDTO } from './unlock';
-import { WorkerMutexErrorCodeEnum } from '../errors/WorkerMutexErrorCodeEnum';
 import type { WorkerMutexLease } from '../WorkerMutexLease';
+import { WorkerMutexErrorCodeEnum, WorkerMutexError } from '../errors';
 import { WorkerMutexModeEnum } from '../WorkerMutexModeEnum';
-import { WorkerMutexError } from '../errors/WorkerMutexError';
 import { captureSharedBufferRuntime } from '../internal/capture-shared-buffer-runtime';
 import { captureAtomics } from '../internal/capture-atomics';
 import { captureWorkerRuntime } from '../internal/capture-worker-runtime';
